@@ -1,0 +1,8 @@
+-r base.txt
+django-extensions
+pytest
+pytest-django
+pytest-cov
+black
+flake8
+ipython

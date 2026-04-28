@@ -1,0 +1,17 @@
+Django>=4.2,<5.0
+djangorestframework
+djangorestframework-simplejwt
+psycopg2-binary
+python-dotenv
+django-redis
+redis
+django-filter
+Pillow
+django-cors-headers
+celery
+django-celery-beat
+django-celery-results
+channels
+channels-redis
+daphne
+confluent-kafka
