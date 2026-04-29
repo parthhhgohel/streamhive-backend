@@ -17,6 +17,13 @@ class RegisterView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
+        from apps.users.tasks import send_welcome_email
+        send_welcome_email.delay(
+            user_email=user.email,
+            display_name=user.display_name,
+            username=user.username
+        )
+
         refresh = RefreshToken.for_user(user)
         return Response({
             "user": {
