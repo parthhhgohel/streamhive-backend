@@ -15,3 +15,6 @@ channels
 channels-redis
 daphne
 confluent-kafka
+cloudinary
+django-cloudinary-storage
+django-extensions
