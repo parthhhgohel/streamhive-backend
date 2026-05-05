@@ -71,9 +71,13 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
         tags = extract_hashtags(post.content)
 
+        hashtag_objs = []
         for tag_name in tags:
             hashtag, _ = Hashtag.objects.get_or_create(name=tag_name)
-            hashtag.posts.add(post)
+            hashtag_objs.append(hashtag)
+
+        if hashtag_objs:
+            post.hashtags.add(*hashtag_objs)
 
         mentions = extract_mentions(post.content)
         if mentions:
@@ -91,7 +95,9 @@ class PostCreateSerializer(serializers.ModelSerializer):
             payload={
                 "post_id": str(post.id),
                 "author_id": str(post.author_id),
+                "author_username": post.author.username,
                 "content": post.content,
+                "media_url": post.media.url if post.media else None,
                 "hashtags": tags,
                 "is_repost": post.is_repost,
             },

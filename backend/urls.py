@@ -33,4 +33,6 @@ urlpatterns = [
     path('api/v1/feed/', include('apps.feed.urls')),
     
     path('api/v1/notifications/', include('apps.notifications.urls')),
+
+    path("api/v1/trending/", include("apps.trending.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

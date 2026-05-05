@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'apps.feed.apps.FeedConfig',
     'apps.notifications.apps.NotificationsConfig',
     'apps.comments.apps.CommentsConfig',
+    'apps.trending.apps.TrendingConfig',
 
     # THIRD PARTY APPS
     "rest_framework",
@@ -194,6 +195,11 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 # KAFKA
 KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+
+# CASSANDRA
+CASSANDRA_HOSTS = os.environ.get("CASSANDRA_HOSTS", "localhost").split(",")
+CASSANDRA_KEYSPACE = os.environ.get("CASSANDRA_KEYSPACE", "streamhive")
+CASSANDRA_PORT = int(os.environ.get("CASSANDRA_PORT", 9042))
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

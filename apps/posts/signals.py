@@ -36,13 +36,15 @@
 
 
 ####-------------------------------------------- KAFKA ----------------------------------------------###
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, post_delete, m2m_changed
 from django.dispatch import receiver
 from django.db.models import F
 from .models import Like, Post
 from apps.comments.models import Comment
 from kafka.producer import kafka_producer
 from kafka.topics import Topics
+from django_redis import get_redis_connection
+from apps.trending.views import TRENDING_KEY, TRENDING_POSTS_KEY
 import logging
 
 logger = logging.getLogger(__name__)
@@ -55,6 +57,15 @@ def on_like_created(sender, instance, created, **kwargs):
             like_count=F("like_count") + 1
         )
 
+        try:
+            redis_conn = get_redis_connection("default")
+            redis_conn.zincrby(TRENDING_POSTS_KEY, 1, str(instance.post_id))
+            # expire after 24 hours so trending stays fresh
+            redis_conn.expire(TRENDING_POSTS_KEY, 86400)
+
+        except Exception as e:
+            logger.error(f"Trending posts update failed: {e}")
+
         # publish to Kafka - notification consumer handles the rest
         kafka_producer.publish(
             topic=Topics.POST_LIKED,
@@ -66,6 +77,19 @@ def on_like_created(sender, instance, created, **kwargs):
             key=str(instance.post_id)
         )
 
+# Add this new signal for hashtag trending
+@receiver(m2m_changed, sender=Post.hashtags.through)
+def on_post_hashtags_changed(sender, instance, action, pk_set, **kwargs):
+    if action == "post_add" and pk_set:
+        if not isinstance(instance, Post):
+            return
+        try:
+            redis_conn = get_redis_connection("default")
+            for hashtag in instance.hashtags.filter(pk__in=pk_set):
+                redis_conn.zincrby(TRENDING_KEY, 1, hashtag.name)
+                redis_conn.expire(TRENDING_KEY, 86400)
+        except Exception as e:
+            logger.error(f"Trending hashtags update failed: {e}")
 
 @receiver(post_delete, sender=Like)
 def on_like_deleted(sender, instance, **kwargs):

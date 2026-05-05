@@ -46,12 +46,13 @@ class NotificationConsumer(BaseConsumer):
         if recipient_id == sender_id:
             return
 
-        Notification.objects.create(
+        notification = Notification.objects.create(
             recipient_id=recipient_id,
             sender_id=sender_id,
             notification_type=Notification.NotificationType.LIKE,
             post_id=post_id,
         )
+        self._push_websocket_notification(notification)
 
     def _handle_unlike(self, event: dict):
         from apps.notifications.models import Notification
@@ -69,8 +70,10 @@ class NotificationConsumer(BaseConsumer):
             post_id=post_id,
         ).delete()
 
-        logger.info(f"Unlike handler: deleted {deleted_count} notification(s) for sender={sender_id} post={post_id}")
-
+        logger.info(
+            f"Unlike handler: deleted {deleted_count} notification(s) "
+            f"for sender={sender_id} post={post_id}"
+        )
 
     def _handle_comment(self, event: dict):
         from apps.notifications.models import Notification
@@ -86,12 +89,13 @@ class NotificationConsumer(BaseConsumer):
         if recipient_id == sender_id:
             return
 
-        Notification.objects.create(
+        notification = Notification.objects.create(
             recipient_id=recipient_id,
             sender_id=sender_id,
             notification_type=Notification.NotificationType.COMMENT,
             post_id=post_id,
         )
+        self._push_websocket_notification(notification)
 
     def _handle_follow(self, event: dict):
         from apps.notifications.models import Notification
@@ -103,11 +107,12 @@ class NotificationConsumer(BaseConsumer):
             logger.warning(f"Missing fields in follow event: {event}")
             return
 
-        Notification.objects.create(
+        notification = Notification.objects.create(
             recipient_id=recipient_id,
             sender_id=sender_id,
             notification_type=Notification.NotificationType.FOLLOW,
         )
+        self._push_websocket_notification(notification)
 
     def _handle_unfollow(self, event: dict):
         from apps.notifications.models import Notification
@@ -139,9 +144,42 @@ class NotificationConsumer(BaseConsumer):
         if recipient_id == sender_id:
             return
 
-        Notification.objects.create(
+        notification = Notification.objects.create(
             recipient_id=recipient_id,
             sender_id=sender_id,
             notification_type=Notification.NotificationType.MENTION,
             post_id=post_id,
         )
+        self._push_websocket_notification(notification)
+
+    def _push_websocket_notification(self, notification):
+        """
+        Push real-time notification via Django Channels.
+        Uses async_to_sync since consumer.run() is synchronous.
+        """
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+
+        channel_layer = get_channel_layer()
+        group_name = f"notifications_{notification.recipient_id}"
+
+        notification_data = {
+            "id": str(notification.id),
+            "type": notification.notification_type,
+            "sender": notification.sender.username if notification.sender else None,
+            "post_id": str(notification.post_id) if notification.post_id else None,
+            "created_at": notification.created_at.isoformat(),
+            "is_read": False,
+        }
+
+        try:
+            async_to_sync(channel_layer.group_send)(
+                group_name,
+                {
+                    "type": "notification.new",
+                    "notification": notification_data,
+                }
+            )
+            logger.info(f"WebSocket push sent to group: {group_name}")
+        except Exception as e:
+            logger.error(f"WebSocket push failed: {e}")

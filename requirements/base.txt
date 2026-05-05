@@ -16,5 +16,6 @@ channels-redis
 daphne
 confluent-kafka
 cloudinary
+cassandra-driver
 django-cloudinary-storage
 django-extensions
