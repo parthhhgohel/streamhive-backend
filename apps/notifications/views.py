@@ -14,7 +14,12 @@ class NotificationListView(generics.ListAPIView):
     serializer_class = NotificationSerializer
 
     def get_queryset(self):
-        return Notification.objects.filter(recipient=self.request.user).select_related("sender", "post").order_by("-created_at")
+        qs = Notification.objects.filter(recipient=self.request.user).select_related("sender", "post").order_by("-created_at")
+        since = self.request.query_params.get("since")
+        if since:
+            qs = qs.filter(created_at__gt=since)
+
+        return qs
 
 
 class MarkAllReadView(APIView):

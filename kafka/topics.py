@@ -6,3 +6,5 @@ class Topics:
     USER_FOLLOWED = "user.followed"
     USER_UNFOLLOWED = "user.unfollowed"
     USER_MENTIONED = "user.mentioned"
+    VERIFICATION_APPROVED = "verification.approved"
+    VERIFICATION_REJECTED = "verification.rejected"

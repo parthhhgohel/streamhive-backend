@@ -13,6 +13,8 @@ class NotificationConsumer(BaseConsumer):
         Topics.USER_FOLLOWED,
         Topics.USER_UNFOLLOWED,
         Topics.USER_MENTIONED,
+        Topics.VERIFICATION_APPROVED,
+        Topics.VERIFICATION_REJECTED,
     ]
     group_id = "notification-consumer-group"
 
@@ -31,7 +33,11 @@ class NotificationConsumer(BaseConsumer):
             self._handle_unfollow(event)
         elif topic == Topics.USER_MENTIONED:
             self._handle_mention(event)
-
+        elif topic == Topics.VERIFICATION_APPROVED:
+            self._handle_verification_approved(event)
+        elif topic == Topics.VERIFICATION_REJECTED:
+            self._handle_verification_rejected(event)
+            
     def _handle_like(self, event: dict):
         from apps.notifications.models import Notification
 
@@ -183,3 +189,32 @@ class NotificationConsumer(BaseConsumer):
             logger.info(f"WebSocket push sent to group: {group_name}")
         except Exception as e:
             logger.error(f"WebSocket push failed: {e}")
+
+    
+    def _handle_verification_approved(self, event: dict):
+        from apps.notifications.models import Notification
+
+        user_id = event.get("user_id")
+        if not user_id:
+            return
+
+        notification = Notification.objects.create(
+            recipient_id=user_id,
+            sender=None,
+            notification_type=Notification.NotificationType.VERIFIED,
+        )
+        self._push_websocket_notification(notification)
+
+    def _handle_verification_rejected(self, event: dict):
+        from apps.notifications.models import Notification
+
+        user_id = event.get("user_id")
+        if not user_id:
+            return
+
+        notification = Notification.objects.create(
+            recipient_id=user_id,
+            sender=None,
+            notification_type=Notification.NotificationType.REJECTED
+        )
+        self._push_websocket_notification(notification)

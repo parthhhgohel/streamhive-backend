@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
-from .models import User, Follow
+from .models import User, Follow, VerificationRequest
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
@@ -81,6 +81,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     followers_count = serializers.SerializerMethodField()
     following_count = serializers.SerializerMethodField()
     is_following = serializers.SerializerMethodField()
+    is_admin = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -88,6 +89,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "id", "username", "display_name", "bio",
             "avatar", "website", "is_verified", "is_private",
             "followers_count", "following_count", "is_following",
+            "is_admin",
             "created_at"
         ]
         read_only_fields = ["id", "is_verified", "created_at"]
@@ -107,6 +109,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
             ).exists()
 
         return False
+
+    def get_is_admin(self, obj):
+        return obj.is_staff
 
 
 class UpdateProfileSerializer(serializers.ModelSerializer):
@@ -148,3 +153,35 @@ class FollowSerializer(serializers.ModelSerializer):
     class Meta:
         model = Follow
         fields = ["id", "follower", "following", "created_at"]
+
+
+class VerificationRequestSerializer(serializers.ModelSerializer):
+    user = UserMinimalSerializer(read_only=True)
+
+    class Meta:
+        model = VerificationRequest
+        fields = [
+            "id", "user", "reason", "status",
+            "admin_note", "created_at", "updated_at"
+        ]
+        read_only_fields = [
+            "id", "user", "status",
+            "admin_note", "created_at", "updated_at"
+        ]
+
+
+class VerificationRequestCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VerificationRequest
+        fields = ["reason"]
+
+    def validate_reason(self, value):
+        if len(value.strip()) < 20:
+            raise serializers.ValidationError(
+                "Reason must be at least 20 characters."
+            )
+        return value
+
+
+class AdminRejectSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=True)

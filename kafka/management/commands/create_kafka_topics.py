@@ -21,6 +21,8 @@ class Command(BaseCommand):
                 Topics.USER_FOLLOWED,
                 Topics.USER_UNFOLLOWED,
                 Topics.USER_MENTIONED,
+                Topics.VERIFICATION_APPROVED,
+                Topics.VERIFICATION_REJECTED,
             ]
         ]
 

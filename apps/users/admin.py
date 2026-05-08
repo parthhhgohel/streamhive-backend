@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, Follow
+from .models import User, Follow, VerificationRequest
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
@@ -26,3 +26,10 @@ class UserAdmin(BaseUserAdmin):
 class FollowAdmin(admin.ModelAdmin):
     list_display = ["follower", "following", "created_at"]
     search_fields = ["follower__username", "following__username"]
+
+@admin.register(VerificationRequest)
+class VerificationRequestAdmin(admin.ModelAdmin):
+    list_display = ["user", "status", "reviewed_by", "created_at", "updated_at"]
+    list_filter = ["status"]
+    search_fields = ["user__username"]
+    readonly_fields = ["created_at", "updated_at"]

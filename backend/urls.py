@@ -18,6 +18,11 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from apps.users.views.verification_views import (
+    AdminVerificationListView,
+    AdminVerificationApproveView,
+    AdminVerificationRejectView,
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -35,4 +40,8 @@ urlpatterns = [
     path('api/v1/notifications/', include('apps.notifications.urls')),
 
     path("api/v1/trending/", include("apps.trending.urls")),
+
+    path("api/v1/admin/verification-requests/", AdminVerificationListView.as_view(), name="admin_verification_list"),
+    path("api/v1/admin/verification-requests/<uuid:pk>/approve/", AdminVerificationApproveView.as_view(), name="admin_verification_approve"),
+    path("api/v1/admin/verification-requests/<uuid:pk>/reject/", AdminVerificationRejectView.as_view(), name="admin_verification_reject"),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

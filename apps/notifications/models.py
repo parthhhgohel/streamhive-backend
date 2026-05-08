@@ -9,6 +9,8 @@ class Notification(models.Model):
         FOLLOW = "follow", "Follow"
         REPOST = "repost", "Repost"
         MENTION = "mention", "Mention"
+        VERIFIED = "verified", "Verified"
+        REJECTED = "rejected", "Rejected"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     recipient = models.ForeignKey(

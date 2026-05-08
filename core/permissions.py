@@ -17,3 +17,7 @@ class IsCommentOwnerOrPostOwnerOrReadOnly(BasePermission):
         if request.method in ("GET", "HEAD", "OPTIONS"):
             return True
         return obj.author == request.user or obj.post.author == request.user
+
+class IsAdminUser(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and request.user.is_staff

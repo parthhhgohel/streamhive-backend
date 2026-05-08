@@ -55,7 +55,7 @@ class TrendingPostsView(APIView):
         try:
             redis_conn = get_redis_connection("default")
             trending = redis_conn.zrevrange(
-                TRENDING_POSTS_KEY, 0, 9, withscore=True
+                TRENDING_POSTS_KEY, 0, 9, withscores=True
             )
 
             if not trending:
@@ -73,7 +73,7 @@ class TrendingPostsView(APIView):
             serializer = PostSerializer(
                 posts,
                 many=True,
-                context={"requests": request}
+                context={"request": request}
             )
 
             return Response({"results": serializer.data})
