@@ -22,6 +22,7 @@ from apps.users.views.verification_views import (
     AdminVerificationListView,
     AdminVerificationApproveView,
     AdminVerificationRejectView,
+    AdminVerificationRemoveView,
 )
 
 urlpatterns = [
@@ -44,4 +45,5 @@ urlpatterns = [
     path("api/v1/admin/verification-requests/", AdminVerificationListView.as_view(), name="admin_verification_list"),
     path("api/v1/admin/verification-requests/<uuid:pk>/approve/", AdminVerificationApproveView.as_view(), name="admin_verification_approve"),
     path("api/v1/admin/verification-requests/<uuid:pk>/reject/", AdminVerificationRejectView.as_view(), name="admin_verification_reject"),
+    path("api/v1/admin/verification-requests/<uuid:pk>/remove/", AdminVerificationRemoveView.as_view(), name="admin_verification_remove"),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

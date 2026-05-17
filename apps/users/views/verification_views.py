@@ -203,3 +203,33 @@ class AdminVerificationRejectView(APIView):
         return Response(
             VerificationRequestSerializer(verification_request).data
         )
+
+
+class AdminVerificationRemoveView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def delete(self, request, pk):
+        try:
+            verification_request = VerificationRequest.objects.select_related("user").get(pk=pk)
+        except VerificationRequest.DoesNotExist:
+            return Response(
+                {"detail": "Request not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        if verification_request.status != VerificationRequest.Status.APPROVED:
+            return Response(
+                {"detail": "This user is not currently verified."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        verification_request.status = VerificationRequest.Status.REJECTED
+        verification_request.reviewed_by = request.user
+        verification_request.admin_note = "Verification removed by admin."
+        verification_request.save()
+
+        User.objects.filter(pk=verification_request.user_id).update(is_verified=False)
+
+        return Response(
+            VerificationRequestSerializer(verification_request).data
+        )

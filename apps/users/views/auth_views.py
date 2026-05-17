@@ -83,7 +83,7 @@ class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request):
-        from ..serializer import ChangePasswordSerializer
+        from ..serializers import ChangePasswordSerializer
         serializer = ChangePasswordSerializer(
             data=request.data,
             context={"request": request}

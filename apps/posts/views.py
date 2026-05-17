@@ -1,3 +1,6 @@
+from kafka.topics import Topics
+from kafka.producer import kafka_producer
+from rest_framework.decorators import permission_classes
 from django.shortcuts import render
 from rest_framework import generics, status, filters
 from rest_framework.response import Response
@@ -6,6 +9,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
 from rest_framework.views import APIView
+from django.db.models import F
 
 from .models import Post, Like
 from .serializers import PostSerializer, PostCreateSerializer
@@ -112,9 +116,75 @@ class UserPostsView(generics.ListAPIView):
     def get_queryset(self):
         from apps.users.models import User
         user = get_object_or_404(User, username=self.kwargs["username"])
-        return Post.objects.filter(author=user, parent=None).select_related("author").prefetch_related("hashtags")
+        return Post.objects.filter(author=user).select_related("author").prefetch_related("hashtags")
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["request"] = self.request
         return context
+
+
+class RepostView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, req, pk):
+        original_post = get_object_or_404(Post, pk=pk)
+
+        if original_post.is_repost:
+            original_post = original_post.parent
+
+        already_repost = Post.objects.filter(
+            author=req.user,
+            parent=original_post,
+            is_repost=True
+        ).exists()
+
+        if already_repost:
+            return Response(
+                {"detail": "You have already reposted this."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        repost = Post.objects.create(
+            author=req.user,
+            content=original_post.content,
+            parent=original_post,
+            is_repost=True
+        )
+
+        Post.objects.filter(pk=original_post.pk).update(
+            repost_count=F("repost_count") + 1
+        )
+
+        kafka_producer.publish(
+            topic=Topics.POST_REPOSTED,
+            payload={
+                "post_id": str(original_post.id),
+                "post_author_id": str(original_post.author_id),
+                "user_id": str(req.user.id),
+                "repost_id": str(repost.id)
+            },
+            key=str(original_post.id)
+        )
+        
+        return Response(PostSerializer(repost, context={"request": req}).data, status=status.HTTP_201_CREATED)
+
+    def delete(self, req, pk):
+        original_post = get_object_or_404(Post, pk=pk)
+
+        repost = Post.objects.filter(
+            author=req.user,
+            parent=original_post,
+            is_repost=True
+        ).first()
+
+        if not repost:
+            return Response({"detail": "You have not reposted this."}, status=status.HTTP_400_BAD_REQUEST)
+
+        repost.delete()
+
+        Post.objects.filter(pk=original_post.pk).update(
+            repost_count=F("repost_count") - 1
+        )
+
+        return Response({"detail": "Repost removed."}, status=status.HTTP_200_OK)

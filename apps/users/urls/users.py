@@ -1,6 +1,6 @@
 from django.urls import path
 from ..views.user_views import FollowerListView, FollowingListView, MeView, UserProfileView, FollowView
-from ..views.verification_views import VerificationRequestView, VerificationRequestStatusView, AdminVerificationListView, AdminRejectSerializer, AdminVerificationApproveView
+from ..views.verification_views import VerificationRequestView, VerificationRequestStatusView
 
 urlpatterns = [
     path("me/", MeView.as_view(), name="me"),

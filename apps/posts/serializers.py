@@ -15,6 +15,7 @@ class PostSerializer(serializers.ModelSerializer):
     author = UserMinimalSerializer(read_only=True)
     hashtags = HashtagSerializer(many=True, read_only=True)
     is_liked = serializers.SerializerMethodField()
+    is_reposted = serializers.SerializerMethodField()
 
     # for replies - show minimal parent info
     parent = serializers.SerializerMethodField()
@@ -25,7 +26,7 @@ class PostSerializer(serializers.ModelSerializer):
             "id", "author", "content", "media",
             "parent", "is_repost",
             "like_count", "comment_count", "repost_count",
-            "hashtags", "is_liked",
+            "hashtags", "is_liked", "is_reposted",
             "created_at", "updated_at"
         ]
         read_only_fields = [
@@ -39,12 +40,24 @@ class PostSerializer(serializers.ModelSerializer):
             return Like.objects.filter(user=request.user, post=obj).exists()
         return False
 
+    def get_is_reposted(self, obj):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            original_post = obj.parent if obj.is_repost else obj
+            return Post.objects.filter(
+                author=request.user,
+                parent=original_post,
+                is_repost=True
+            ).exists()
+        return False
+
     def get_parent(self, obj):
         if obj.parent:
             return {
                 "id": str(obj.parent.id),
                 "author": obj.parent.author.username,
                 "content": obj.parent.content[:100],
+                "repost_count": obj.parent.repost_count,
             }
         return None
 
@@ -113,3 +126,7 @@ class LikeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Like
         fields = ["id", "user", "post", "created_at"]
+
+
+class RepostSerializer(serializers.Serializer):
+    parent = serializers.UUIDField(required=True)

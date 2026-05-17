@@ -10,6 +10,7 @@ class NotificationConsumer(BaseConsumer):
         Topics.POST_LIKED,
         Topics.POST_UNLIKED,
         Topics.POST_COMMENTED,
+        Topics.POST_REPOSTED,
         Topics.USER_FOLLOWED,
         Topics.USER_UNFOLLOWED,
         Topics.USER_MENTIONED,
@@ -27,6 +28,8 @@ class NotificationConsumer(BaseConsumer):
             self._handle_unlike(event)
         elif topic == Topics.POST_COMMENTED:
             self._handle_comment(event)
+        elif topic == Topics.POST_REPOSTED:
+            self._handle_repost(event)
         elif topic == Topics.USER_FOLLOWED:
             self._handle_follow(event)
         elif topic == Topics.USER_UNFOLLOWED:
@@ -80,6 +83,28 @@ class NotificationConsumer(BaseConsumer):
             f"Unlike handler: deleted {deleted_count} notification(s) "
             f"for sender={sender_id} post={post_id}"
         )
+
+    def _handle_repost(self, event: dict):
+        from apps.notifications.models import Notification
+
+        recipient_id = event.get("post_author_id")
+        sender_id = event.get("user_id")
+        post_id = event.get("post_id")
+
+        if not recipient_id or not sender_id or not post_id:
+            logger.warning(f"Missing fields in repost event: {event}")
+            return
+
+        if recipient_id == sender_id:
+            return
+
+        notification = Notification.objects.create(
+            recipient_id=recipient_id,
+            sender_id=sender_id,
+            notification_type=Notification.NotificationType.REPOST,
+            post_id=post_id,
+        )
+        self._push_websocket_notification(notification)
 
     def _handle_comment(self, event: dict):
         from apps.notifications.models import Notification

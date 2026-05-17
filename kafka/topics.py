@@ -3,6 +3,7 @@ class Topics:
     POST_LIKED = "post.liked"
     POST_UNLIKED = "post.unliked"
     POST_COMMENTED = "post.commented"
+    POST_REPOSTED = "post.reposted"
     USER_FOLLOWED = "user.followed"
     USER_UNFOLLOWED = "user.unfollowed"
     USER_MENTIONED = "user.mentioned"
