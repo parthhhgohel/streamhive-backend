@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 
 COPY requirements/ requirements/
 RUN pip install --upgrade pip
-RUN pip install -r requirements/development.txt
+RUN pip install -r requirements/production.txt
 
 COPY . .
 
