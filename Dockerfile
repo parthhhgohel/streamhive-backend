@@ -13,10 +13,10 @@ RUN apt-get update && apt-get install -y \
 
 COPY requirements/ requirements/
 RUN pip install --upgrade pip
-RUN pip install -r requirements/production.txt
+RUN pip install -r requirements/development.txt
 
 COPY . .
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py collectstatic --noinput && python manage.py migrate && supervisord -c supervisord.conf"]
+CMD ["sh", "-c", "python manage.py collectstatic --noinput && python manage.py migrate && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1"]
