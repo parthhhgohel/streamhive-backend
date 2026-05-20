@@ -60,9 +60,13 @@ STATIC_URL = "/static/"
 
 CORS_ALLOWED_ORIGINS = os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
 
+# KAFKA
 KAFKA_BOOTSTRAP_SERVERS = os.environ["KAFKA_BOOTSTRAP_SERVERS"]
 KAFKA_SASL_USERNAME = os.environ.get("KAFKA_SASL_USERNAME", "")
 KAFKA_SASL_PASSWORD = os.environ.get("KAFKA_SASL_PASSWORD", "")
+
+# ELASTICSEARCH
+ELASTICSEARCH_URL = os.environ.get("ELASTICSEARCH_URL", None)
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 

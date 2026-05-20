@@ -41,6 +41,7 @@ from django.dispatch import receiver
 from django.db.models import F
 from .models import Like, Post
 from apps.comments.models import Comment
+from apps.search.documents import delete_post as es_delete_post
 from kafka.producer import kafka_producer
 from kafka.topics import Topics
 from django_redis import get_redis_connection
@@ -76,6 +77,16 @@ def on_like_created(sender, instance, created, **kwargs):
             },
             key=str(instance.post_id)
         )
+
+@receiver(post_delete, sender=Post)
+def on_post_deleted_search(sender, instance, **kwargs):
+    """
+    Remove post from Elasticsearch when deleted
+    """
+    try:
+        es_delete_post(str(instance.id))
+    except Exception as e:
+        logger.error(f"Failed to remove post from ES: {e}")
 
 # Add this new signal for hashtag trending
 @receiver(m2m_changed, sender=Post.hashtags.through)

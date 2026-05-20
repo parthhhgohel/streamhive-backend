@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'apps.notifications.apps.NotificationsConfig',
     'apps.comments.apps.CommentsConfig',
     'apps.trending.apps.TrendingConfig',
+    'apps.search.apps.SearchConfig',
 
     # THIRD PARTY APPS
     "rest_framework",
@@ -200,6 +201,12 @@ KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9
 CASSANDRA_HOSTS = os.environ.get("CASSANDRA_HOSTS", "localhost").split(",")
 CASSANDRA_KEYSPACE = os.environ.get("CASSANDRA_KEYSPACE", "streamhive")
 CASSANDRA_PORT = int(os.environ.get("CASSANDRA_PORT", 9042))
+
+# ELASTICSEARCH
+ELASTICSEARCH_URL = os.environ.get("ELASTICSEARCH_URL", "http://localhost:9200")
+ELASTICSEARCH_INDEX_PREFIX = os.environ.get("ELASTICSEARCH_INDEX_PREFIX", "streamhive")
+ELASTICSEARCH_POSTS_INDEX = f"{ELASTICSEARCH_INDEX_PREFIX}_posts"
+ELASTICSEARCH_USERS_INDEX = f"{ELASTICSEARCH_INDEX_PREFIX}_users"
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

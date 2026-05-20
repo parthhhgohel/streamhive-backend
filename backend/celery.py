@@ -7,5 +7,5 @@ os.environ.setdefault(
 )
 
 app = Celery("streamhive")
-app.config_from_object(os.environ["DJANGO_SETTINGS_MODULE"], namespace="CELERY")
+app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()

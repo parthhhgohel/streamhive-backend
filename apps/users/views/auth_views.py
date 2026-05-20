@@ -17,6 +17,21 @@ class RegisterView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
+        from kafka.producer import kafka_producer
+        from kafka.topics import Topics
+
+        kafka_producer.publish(
+            topic=Topics.USER_REGISTERED,
+            payload={
+                "user_id": str(user.id),
+                "username": user.username,
+                "display_name": user.display_name,
+                "bio": user.bio or "",
+                "is_verified": user.is_verified,
+            },
+            key=str(user.id)
+        )
+
         from apps.users.tasks import send_welcome_email
         send_welcome_email.delay(
             user_email=user.email,

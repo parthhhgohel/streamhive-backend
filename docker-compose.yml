@@ -56,6 +56,22 @@ services:
       timeout: 10s
       retries: 10
 
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false # disable auth for dev
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m # limit memory for local dev
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
   web:
     build: .
     command: >
@@ -71,6 +87,7 @@ services:
       - redis
       - kafka
       - cassandra
+      - elasticsearch
 
   celery_worker:
     build: .
@@ -122,7 +139,18 @@ services:
     depends_on:
       - kafka
       - cassandra
+  
+  consumer_search:
+    build: .
+    command: python manage.py start_search_consumer
+    volumes:
+      - .:/app
+    env_file: .env
+    depends_on:
+      - kafka
+      - elasticsearch
 
 volumes:
   postgres_data:
   cassandra_data:
+  elasticsearch_data:

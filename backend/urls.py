@@ -42,6 +42,8 @@ urlpatterns = [
 
     path("api/v1/trending/", include("apps.trending.urls")),
 
+    path("api/v1/search/", include("apps.search.urls")),
+
     path("api/v1/admin/verification-requests/", AdminVerificationListView.as_view(), name="admin_verification_list"),
     path("api/v1/admin/verification-requests/<uuid:pk>/approve/", AdminVerificationApproveView.as_view(), name="admin_verification_approve"),
     path("api/v1/admin/verification-requests/<uuid:pk>/reject/", AdminVerificationRejectView.as_view(), name="admin_verification_reject"),
