@@ -19,4 +19,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py collectstatic --noinput && python manage.py migrate && supervisord -c supervisord.conf"]
+CMD ["sh", "-c", "python manage.py collectstatic --noinput && python manage.py migrate && supervisord -c /app/supervisord.conf"]

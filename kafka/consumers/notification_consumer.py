@@ -163,25 +163,29 @@ class NotificationConsumer(BaseConsumer):
 
     def _handle_mention(self, event: dict):
         from apps.notifications.models import Notification
+        from apps.users.models import User
 
-        recipient_id = event.get("mentioned_user_id")
+        mentions = event.get("mentions", [])
         sender_id = event.get("user_id")
         post_id = event.get("post_id")
 
-        if not recipient_id or not sender_id or not post_id:
+        if not mentions or not sender_id or not post_id:
             logger.warning(f"Missing fields in mention event: {event}")
             return
 
-        if recipient_id == sender_id:
-            return
+        mentioned_users = User.objects.filter(
+            username__in=mentions,
+            is_active=True
+        ).exclude(id=sender_id)
 
-        notification = Notification.objects.create(
-            recipient_id=recipient_id,
-            sender_id=sender_id,
-            notification_type=Notification.NotificationType.MENTION,
-            post_id=post_id,
-        )
-        self._push_websocket_notification(notification)
+        for user in mentioned_users:
+            notification = Notification.objects.create(
+                recipient=user,
+                sender_id=sender_id,
+                notification_type=Notification.NotificationType.MENTION,
+                post_id=post_id,
+            )
+            self._push_websocket_notification(notification)
 
     def _push_websocket_notification(self, notification):
         """

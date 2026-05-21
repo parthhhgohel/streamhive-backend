@@ -32,12 +32,16 @@ class RegisterView(generics.CreateAPIView):
             key=str(user.id)
         )
 
-        from apps.users.tasks import send_welcome_email
-        send_welcome_email.delay(
-            user_email=user.email,
-            display_name=user.display_name,
-            username=user.username
-        )
+        try:
+            from apps.users.tasks import send_welcome_email_direct
+            send_welcome_email_direct(
+                user_email=user.email,
+                display_name=user.display_name,
+                username=user.username
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Welcome email failed: {e}")
 
         refresh = RefreshToken.for_user(user)
         return Response({

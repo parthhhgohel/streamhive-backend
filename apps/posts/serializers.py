@@ -94,8 +94,15 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
         mentions = extract_mentions(post.content)
         if mentions:
-            from apps.notifications.tasks import create_mention_notifications
-            create_mention_notifications(str(post.id), str(user.id), mentions)
+            kafka_producer.publish(
+                topic=Topics.USER_MENTIONED,
+                payload={
+                    "post_id": str(post.id),
+                    "user_id": str(user.id),
+                    "mentions": mentions,
+                },
+                key=str(user.id)
+            )
 
         if post.is_repost and post.parent:
             from django.db.models import F
