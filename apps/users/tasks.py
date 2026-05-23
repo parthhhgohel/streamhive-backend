@@ -177,26 +177,54 @@ def _build_otp_email_html(display_name: str, otp: str, expiry_minutes: int = 15)
 """
 
 
+# def send_otp_email_direct(user_email: str, display_name: str, otp: str):
+#     """
+#     Send OTTP email directly without Celery.
+#     Used in production where celery_worker is not running.
+#     """
+#     try:
+#         from django.core.mail import send_mail
+#         from django.conf import settings
+
+#         expiry = getattr(settings, "OTP_EXPIRY_MINUTES", 15)
+#         html_content = _build_otp_email_html(display_name, otp, expiry)
+
+#         send_mail(
+#             subject="Your StreamHive password reset OTP",
+#             message=f"Your OTP is: {otp}. Valid for {expiry} minutes.",
+#             from_email=settings.DEFAULT_FROM_EMAIL,
+#             recipient_list=[user_email],
+#             html_message=html_content,
+#             fail_silently=False,
+#         )
+#         logger.info(f"OTP email sent to {user_email}")
+#     except Exception as e:
+#         logger.error(f"OTP email failed for {user_email}: {e}")
+#         raise
+
 def send_otp_email_direct(user_email: str, display_name: str, otp: str):
-    """
-    Send OTTP email directly without Celery.
-    Used in production where celery_worker is not running.
-    """
     try:
-        from django.core.mail import send_mail
+        from django.core.mail import get_connection, EmailMultiAlternatives
         from django.conf import settings
 
         expiry = getattr(settings, "OTP_EXPIRY_MINUTES", 15)
         html_content = _build_otp_email_html(display_name, otp, expiry)
 
-        send_mail(
-            subject="Your StreamHive password reset OTP",
-            message=f"Your OTP is: {otp}. Valid for {expiry} minutes.",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user_email],
-            html_message=html_content,
-            fail_silently=False,
+        connection = get_connection(
+            backend="django.core.mail.backends.smtp.EmailBackend",
+            timeout=10,
         )
+
+        email = EmailMultiAlternatives(
+            subject="Your StreamHive password reset OTP",
+            body=f"Your OTP is: {otp}. Valid for {expiry} minutes.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[user_email],
+            connection=connection,
+        )
+        email.attach_alternative(html_content, "text/html")
+        email.send(fail_silently=False)
+
         logger.info(f"OTP email sent to {user_email}")
     except Exception as e:
         logger.error(f"OTP email failed for {user_email}: {e}")
