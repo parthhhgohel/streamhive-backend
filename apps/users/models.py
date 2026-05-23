@@ -1,4 +1,7 @@
 import uuid
+import random
+import string
+from django.utils import timezone
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
@@ -49,6 +52,53 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return f"@{self.username}"
 
+class PasswordResetOTP(models.Model):
+    """
+    Stores OTP for password reset
+    One active OTP per user at a time
+    Old ones are overwritten on new request
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='password_reset_otp')
+    otp = models.CharField(max_length=6)
+    reset_token = models.CharField(max_length=100, blank=True, null=True) # added in this models because redis is not available in production
+    reset_token_expires_at = models.DateTimeField(null=True, blank=True) # same
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    attempts = models.IntegerField(default=0)
+    is_used = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "password_reset_otps"
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+    
+    def is_valid(self):
+        return not self.is_used and not self.is_expired()
+    
+    @classmethod
+    def generate_otp(cls):
+        return "".join(random.choices(string.digits, k=6))
+
+    @classmethod
+    def create_for_user(cls, user):
+        from datetime import timedelta
+        from django.conf import settings
+
+        # Delete existing OTP for this user to avoid IntegrityError on OneToOneField
+        cls.objects.filter(user=user).delete()
+
+        otp = cls.generate_otp()
+        expires_at = timezone.now() + timedelta(
+            minutes=getattr(settings, "OTP_EXPIRY_MINUTES", 15)
+        )
+
+        return cls.objects.create(user=user, otp=otp, expires_at=expires_at)
+
+    def __str__(self):
+        return f"OTP for {self.user.username} - expires {self.expires_at}"
+
 class Follow(models.Model):
     # follower → follows → following
     # e.g. "Alice follows Bob": follower=Alice, following=Bob
@@ -73,7 +123,7 @@ class Block(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     blocker = models.ForeignKey(User, on_delete=models.CASCADE, related_name='blocking_set')
     blocked = models.ForeignKey(User, on_delete=models.CASCADE, related_name='blocked_set')
-    create_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "blocks"

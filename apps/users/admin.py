@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, Follow, VerificationRequest
+from .models import User, Follow, VerificationRequest, PasswordResetOTP
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
@@ -33,3 +33,10 @@ class VerificationRequestAdmin(admin.ModelAdmin):
     list_filter = ["status"]
     search_fields = ["user__username"]
     readonly_fields = ["created_at", "updated_at"]
+
+@admin.register(PasswordResetOTP)
+class PasswordResetOTPAdmin(admin.ModelAdmin):
+    list_display = ["user", "created_at", "expires_at", "attempts", "is_used"]
+    list_filter = ["is_used"]
+    search_fields = ["user__username", "user__email"]
+    readonly_fields = ["otp", "created_at", "expires_at"]
