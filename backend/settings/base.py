@@ -218,6 +218,21 @@ ELASTICSEARCH_INDEX_PREFIX = os.environ.get("ELASTICSEARCH_INDEX_PREFIX", "strea
 ELASTICSEARCH_POSTS_INDEX = f"{ELASTICSEARCH_INDEX_PREFIX}_posts"
 ELASTICSEARCH_USERS_INDEX = f"{ELASTICSEARCH_INDEX_PREFIX}_users"
 
+# OAuth Google & Github
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI = os.environ.get(
+    "GOOGLE_REDIRECT_URI",
+    "http://localhost:8000/api/v1/auth/google/callback/"
+)
+
+GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", "")
+GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "")
+GITHUB_REDIRECT_URI = os.environ.get(
+    "GITHUB_REDIRECT_URI",
+    "http://localhost:8000/api/v1/auth/github/callback/"
+)
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 

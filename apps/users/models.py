@@ -35,6 +35,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_private = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    auth_provider = models.CharField(max_length=20, default="email")
+    auth_provider_id = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -46,7 +48,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         db_table = "users"
         indexes = [
             models.Index(fields=["username"]),
-            models.Index(fields=["email"])
+            models.Index(fields=["email"]),
+            models.Index(fields=["auth_provider", "auth_provider_id"]),
         ]
 
     def __str__(self):

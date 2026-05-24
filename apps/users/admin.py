@@ -11,6 +11,7 @@ class UserAdmin(BaseUserAdmin):
     fieldsets = (
         (None, {"fields": ("email", "username", "password")}),
         ("Profile", {"fields": ("display_name", "bio", "avatar", "website")}),
+        ("OAuth", {"fields": ("auth_provider", "auth_provider_id")}),    # ADD
         ("Flags", {"fields": ("is_verified", "is_private", "is_active", "is_staff")}),
     )
 
