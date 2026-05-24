@@ -81,20 +81,28 @@ def send_welcome_email(user_email: str, display_name: str, username: str):
         logger.error(f"Failed to send welcome email to {user_email}: {e}")
 
 
+# BREVO
 def send_welcome_email_direct(user_email: str, display_name: str, username: str):
-    """Direct version — used in production without celery_worker."""
     try:
-        from django.core.mail import send_mail
+        import sib_api_v3_sdk
+        from django.conf import settings
+
         html_content = _build_welcome_email_html(display_name, username)
-        send_mail(
-            subject=f"Welcome to StreamHive, {display_name}!",
-            message=f"Welcome to StreamHive, {display_name}! Visit us at {settings.FRONTEND_URL}",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user_email],
-            html_message=html_content,
-            fail_silently=True,
+
+        configuration = sib_api_v3_sdk.Configuration()
+        configuration.api_key["api-key"] = settings.BREVO_API_KEY
+
+        api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
+            sib_api_v3_sdk.ApiClient(configuration)
         )
-        logger.info(f"Welcome email sent directly to {user_email}")
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=[{"email": user_email}],
+            sender={"email": "parthgohel806@gmail.com", "name": "StreamHive"},
+            subject=f"Welcome to StreamHive, {display_name}!",
+            html_content=html_content,
+        )
+        api_instance.send_transac_email(send_smtp_email)
+        logger.info(f"Welcome email sent to {user_email}")
     except Exception as e:
         logger.error(f"Direct welcome email failed: {e}")
 
@@ -177,67 +185,38 @@ def _build_otp_email_html(display_name: str, otp: str, expiry_minutes: int = 15)
 """
 
 
-# def send_otp_email_direct(user_email: str, display_name: str, otp: str):
-#     """
-#     Send OTTP email directly without Celery.
-#     Used in production where celery_worker is not running.
-#     """
-#     try:
-#         from django.core.mail import send_mail
-#         from django.conf import settings
-
-#         expiry = getattr(settings, "OTP_EXPIRY_MINUTES", 15)
-#         html_content = _build_otp_email_html(display_name, otp, expiry)
-
-#         send_mail(
-#             subject="Your StreamHive password reset OTP",
-#             message=f"Your OTP is: {otp}. Valid for {expiry} minutes.",
-#             from_email=settings.DEFAULT_FROM_EMAIL,
-#             recipient_list=[user_email],
-#             html_message=html_content,
-#             fail_silently=False,
-#         )
-#         logger.info(f"OTP email sent to {user_email}")
-#     except Exception as e:
-#         logger.error(f"OTP email failed for {user_email}: {e}")
-#         raise
-
+# BREVO emailing
 def send_otp_email_direct(user_email: str, display_name: str, otp: str):
     try:
-        from django.core.mail import get_connection, EmailMultiAlternatives
+        import sib_api_v3_sdk
+        from sib_api_v3_sdk.rest import ApiException
         from django.conf import settings
 
         expiry = getattr(settings, "OTP_EXPIRY_MINUTES", 15)
         html_content = _build_otp_email_html(display_name, otp, expiry)
 
-        connection = get_connection(
-            backend="django.core.mail.backends.smtp.EmailBackend",
-            timeout=10,
-        )
+        configuration = sib_api_v3_sdk.Configuration()
+        configuration.api_key["api-key"] = settings.BREVO_API_KEY
 
-        email = EmailMultiAlternatives(
+        api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
+            sib_api_v3_sdk.ApiClient(configuration)
+        )
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=[{"email": user_email}],
+            sender={"email": "parthgohel806@gmail.com", "name": "StreamHive"},
             subject="Your StreamHive password reset OTP",
-            body=f"Your OTP is: {otp}. Valid for {expiry} minutes.",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[user_email],
-            connection=connection,
+            html_content=html_content,
         )
-        email.attach_alternative(html_content, "text/html")
-        email.send(fail_silently=False)
-
+        api_instance.send_transac_email(send_smtp_email)
         logger.info(f"OTP email sent to {user_email}")
     except Exception as e:
         logger.error(f"OTP email failed for {user_email}: {e}")
         raise
 
-
+# BREVO
 def send_password_changed_email_direct(user_email: str, display_name: str):
-    """
-    Sends a confirmation email after password is successfully changed.
-    Security best practice — user knows if someone changed their password.
-    """
     try:
-        from django.core.mail import send_mail
+        import sib_api_v3_sdk
         from django.conf import settings
         from django.utils import timezone
 
@@ -265,7 +244,7 @@ def send_password_changed_email_direct(user_email: str, display_name: str):
                 <tr>
                   <td style="padding:16px;background-color:#1a0a0a;border:1px solid #7f1d1d;border-radius:10px;">
                     <p style="margin:0;color:#fca5a5;font-size:13px;">
-                      🚨 <strong>If you didn't do this</strong>, your account may be compromised. Please contact support immediately and change your password right away.
+                      🚨 <strong>If you didn't do this</strong>, your account may be compromised. Please contact support immediately.
                     </p>
                   </td>
                 </tr>
@@ -294,14 +273,19 @@ def send_password_changed_email_direct(user_email: str, display_name: str):
 </html>
 """
 
-        send_mail(
-            subject="Your StreamHive password was changed",
-            message=f"Your StreamHive password was changed. If this wasn't you, contact support immediately.",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user_email],
-            html_message=html_content,
-            fail_silently=True,
+        configuration = sib_api_v3_sdk.Configuration()
+        configuration.api_key["api-key"] = settings.BREVO_API_KEY
+
+        api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
+            sib_api_v3_sdk.ApiClient(configuration)
         )
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=[{"email": user_email}],
+            sender={"email": "parthgohel806@gmail.com", "name": "StreamHive"},
+            subject="Your StreamHive password was changed",
+            html_content=html_content,
+        )
+        api_instance.send_transac_email(send_smtp_email)
         logger.info(f"Password changed confirmation sent to {user_email}")
     except Exception as e:
         logger.error(f"Password changed email failed: {e}")

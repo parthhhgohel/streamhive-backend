@@ -2,3 +2,4 @@
 gunicorn
 whitenoise
 supervisor
+sib-api-v3-sdk

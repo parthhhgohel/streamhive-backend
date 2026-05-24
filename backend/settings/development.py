@@ -10,6 +10,8 @@ ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS += ["django_extensions"]
 
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+
 CORS_ALLOW_ALL_ORIGINS = True
 
 LOGGING = {
