@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
+from django.http import JsonResponse
 from django.conf.urls.static import static
 from apps.users.views.verification_views import (
     AdminVerificationListView,
@@ -25,8 +26,13 @@ from apps.users.views.verification_views import (
     AdminVerificationRemoveView,
 )
 
+def health_check(request):
+    return JsonResponse({'status': 'ok'})
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    path('health/', health_check),
     
     path('api/v1/auth/', include('apps.users.urls.auth')),
     
