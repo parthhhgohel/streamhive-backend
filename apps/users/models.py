@@ -121,6 +121,30 @@ class Follow(models.Model):
     def __str__(self):
         return f"{self.follower} follows {self.following}"
 
+
+class FollowRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ACCEPTED = "accepted", "Accepted"
+        REJECTED = "rejected", "Rejected"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_follow_requests")
+    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name="received_follow_requests")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "follow_requests"
+        unique_together = ("sender", "receiver")
+        indexes = [
+            models.Index(fields=["receiver", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.sender} -> {self.receiver} ({self.status})"
+
+
 class Block(models.Model):
     # Block user
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

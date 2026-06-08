@@ -5,11 +5,12 @@ from apps.users.serializers import UserMinimalSerializer
 class CommentSerializer(serializers.ModelSerializer):
     author = UserMinimalSerializer(read_only=True)
     replies_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
         fields = [
-            "id", "post", "author", "parent", "content", "like_count", "replies_count", "created_at", "updated_at"
+            "id", "post", "author", "parent", "content", "like_count", "is_liked", "replies_count", "created_at", "updated_at"
         ]
 
         read_only_fields = [
@@ -18,6 +19,13 @@ class CommentSerializer(serializers.ModelSerializer):
 
     def get_replies_count(self, obj):
         return obj.replies.count()
+
+    def get_is_liked(self, obj):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            from .models import CommentLike
+            return CommentLike.objects.filter(user=request.user, comment=obj).exists()
+        return False
 
 
 class CommentCreateSerializer(serializers.ModelSerializer):

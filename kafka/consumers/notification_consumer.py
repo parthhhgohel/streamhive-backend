@@ -16,6 +16,8 @@ class NotificationConsumer(BaseConsumer):
         Topics.USER_MENTIONED,
         Topics.VERIFICATION_APPROVED,
         Topics.VERIFICATION_REJECTED,
+        Topics.COMMENT_LIKED,
+        Topics.COMMENT_UNLIKED,
     ]
     group_id = "notification-consumer-group"
 
@@ -40,6 +42,10 @@ class NotificationConsumer(BaseConsumer):
             self._handle_verification_approved(event)
         elif topic == Topics.VERIFICATION_REJECTED:
             self._handle_verification_rejected(event)
+        elif topic == Topics.COMMENT_LIKED:
+            self._handle_comment_like(event)
+        elif topic == Topics.COMMENT_UNLIKED:
+            self._handle_comment_unlike(event)
             
     def _handle_like(self, event: dict):
         from apps.notifications.models import Notification
@@ -247,3 +253,41 @@ class NotificationConsumer(BaseConsumer):
             notification_type=Notification.NotificationType.REJECTED
         )
         self._push_websocket_notification(notification)
+
+    def _handle_comment_like(self, event: dict):
+        from apps.notifications.models import Notification
+
+        recipient_id = event.get("comment_author_id")
+        sender_id = event.get("user_id")
+        post_id = event.get("post_id")
+
+        if not recipient_id or not sender_id or not post_id:
+            logging.warning(f"Missing fields in comment like event: {event}")
+            return
+
+        if recipient_id == sender_id:
+            return
+
+        notification = Notification.objects.create(
+            recipient_id=recipient_id,
+            sender_id=sender_id,
+            notification_type=Notification.NotificationType.COMMENT_LIKE,
+            post_id=post_id,
+        )
+
+        self._push_websocket_notification(notification)
+
+    def _handle_comment_unlike(self, event: dict):
+        from apps.notifications.models import Notification
+
+        sender_id = event.get("user_id")
+        comment_id = event.get("comment_id")
+
+        if not sender_id or not comment_id:
+            logger.warning(f"Missing fields in comment unlike event: {event}")
+            return
+
+        Notification.objects.filter(
+            sender_id=sender_id,
+            notification_type=Notification.NotificationType.COMMENT_LIKE,
+        ).delete()

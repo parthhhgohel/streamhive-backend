@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Post, Like, Hashtag
+from .models import Post, Like, Hashtag, SavedPost
 from apps.users.serializers import UserMinimalSerializer
 from core.utils import extract_hashtags, extract_mentions
 from kafka.producer import kafka_producer
@@ -16,6 +16,7 @@ class PostSerializer(serializers.ModelSerializer):
     hashtags = HashtagSerializer(many=True, read_only=True)
     is_liked = serializers.SerializerMethodField()
     is_reposted = serializers.SerializerMethodField()
+    is_saved = serializers.SerializerMethodField()
 
     # for replies - show minimal parent info
     parent = serializers.SerializerMethodField()
@@ -25,8 +26,8 @@ class PostSerializer(serializers.ModelSerializer):
         fields = [
             "id", "author", "content", "media",
             "parent", "is_repost",
-            "like_count", "comment_count", "repost_count",
-            "hashtags", "is_liked", "is_reposted",
+            "like_count", "comment_count", "repost_count", "saved_count",
+            "hashtags", "is_liked", "is_reposted", "is_saved",
             "created_at", "updated_at"
         ]
         read_only_fields = [
@@ -61,6 +62,11 @@ class PostSerializer(serializers.ModelSerializer):
             }
         return None
 
+    def get_is_saved(self, obj):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return SavedPost.objects.filter(user=request.user, post=obj).exists()
+        return False
 
 class PostCreateSerializer(serializers.ModelSerializer):
     class Meta:

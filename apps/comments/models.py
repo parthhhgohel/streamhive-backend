@@ -32,3 +32,26 @@ class Comment(models.Model):
         indexes = [
             models.Index(fields=["post", "created_at"]),
         ]
+
+
+class CommentLike(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="comment_likes"
+    )
+    comment = models.ForeignKey(
+        Comment,
+        on_delete=models.CASCADE,
+        related_name="likes"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "comment_likes"
+        unique_together = ("user", "comment")
+        indexes = [
+            models.Index(fields=["comment"]),
+            models.Index(fields=["user"]),
+        ]

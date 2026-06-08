@@ -1,9 +1,11 @@
 from rest_framework import generics, status
+from rest_framework.response import Response
 from django.shortcuts import render
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly
 from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
 
-from .models import Comment
+from .models import Comment, CommentLike
 from .serializers import CommentSerializer, CommentCreateSerializer
 from apps.posts.models import Post
 from core.permissions import IsOwnerOrReadOnly, IsCommentOwnerOrPostOwnerOrReadOnly
@@ -75,3 +77,44 @@ class CommentRepliesView(generics.ListAPIView):
         context = super().get_serializer_context()
         context["request"] = self.request
         return context
+
+
+class CommentLikeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        comment = get_object_or_404(Comment, pk=pk)
+        like, created = CommentLike.objects.get_or_create(
+            user=request.user,
+            comment=comment
+        )
+
+        if not created:
+            return Response(
+                {"detail": "You have already liked this comment."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(
+            {"detail": "Comment liked successfully."},
+            status=status.HTTP_201_CREATED
+        )
+
+    def delete(self, request, pk):
+        comment = get_object_or_404(Comment, pk=pk)
+        user = request.user
+
+        like = CommentLike.objects.filter(user=user, comment=comment).first()
+
+        if not like:
+            return Response(
+                {"detail": "You have not liked this comment."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        like.delete()
+
+        return Response(
+            {"detail": "Comment unliked successfully."},
+            status=status.HTTP_200_OK
+        )

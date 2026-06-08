@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
-from .models import User, Follow, VerificationRequest
+from .models import User, Follow, VerificationRequest, FollowRequest
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
@@ -82,6 +82,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     following_count = serializers.SerializerMethodField()
     is_following = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
+    is_follow_requested = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -89,8 +90,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "id", "username", "display_name", "bio",
             "avatar", "website", "is_verified", "is_private",
             "followers_count", "following_count", "is_following",
-            "is_admin",
-            "created_at"
+            "is_follow_requested", "is_admin", "created_at"
         ]
         read_only_fields = ["id", "is_verified", "created_at"]
 
@@ -112,6 +112,17 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_is_admin(self, obj):
         return obj.is_staff
+
+    def get_is_follow_requested(self, obj):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            from .models import FollowRequest
+            return FollowRequest.objects.filter(
+                sender=request.user,
+                receiver=obj,
+                status=FollowRequest.Status.PENDING
+            ).exists()
+        return False
 
 
 class UpdateProfileSerializer(serializers.ModelSerializer):
@@ -188,6 +199,14 @@ class FollowSerializer(serializers.ModelSerializer):
     class Meta:
         model = Follow
         fields = ["id", "follower", "following", "created_at"]
+
+
+class FollowRequestSerializer(serializers.ModelSerializer):
+    sender = UserMinimalSerializer(read_only=True)
+
+    class Meta:
+        model = FollowRequest
+        fields = ["id", "sender", "status", "created_at"]
 
 
 class VerificationRequestSerializer(serializers.ModelSerializer):

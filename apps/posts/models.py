@@ -26,6 +26,7 @@ class Post(models.Model):
     like_count = models.PositiveIntegerField(default=0)
     comment_count = models.PositiveIntegerField(default=0)
     repost_count = models.PositiveIntegerField(default=0)
+    saved_count = models.PositiveIntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -70,3 +71,18 @@ class Hashtag(models.Model):
 
     def __str__(self):
         return f"#{self.name}"
+
+
+class SavedPost(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="saves")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_posts")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "saved_posts"
+        unique_together = ("user", "post")
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["post"]),
+        ]

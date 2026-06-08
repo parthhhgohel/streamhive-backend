@@ -11,6 +11,7 @@ class Notification(models.Model):
         MENTION = "mention", "Mention"
         VERIFIED = "verified", "Verified"
         REJECTED = "rejected", "Rejected"
+        COMMENT_LIKE = "comment_like", "Comment Like"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     recipient = models.ForeignKey(

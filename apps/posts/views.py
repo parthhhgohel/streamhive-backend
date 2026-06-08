@@ -11,7 +11,7 @@ from django.core.cache import cache
 from rest_framework.views import APIView
 from django.db.models import F
 
-from .models import Post, Like
+from .models import Post, Like, SavedPost
 from .serializers import PostSerializer, PostCreateSerializer
 from core.permissions import IsOwnerOrReadOnly
 from core.pagination import FeedCursorPagination
@@ -114,14 +114,36 @@ class UserPostsView(generics.ListAPIView):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        from apps.users.models import User
-        user = get_object_or_404(User, username=self.kwargs["username"])
+        from apps.users.models import User, Follow
+        user = get_object_or_404(User, username=self.kwargs["username"], is_active=True)
+
+        if user.is_private:
+            request = self.request
+
+            if not request.user.is_authenticated:
+                return Post.objects.none()
+            if request.user != user and not Follow.objects.filter(follower=request.user, following=user).exists():
+                return Post.objects.none()
+        
         return Post.objects.filter(author=user).select_related("author").prefetch_related("hashtags")
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["request"] = self.request
         return context
+
+    def list(self, request, *args, **kwargs):
+        from apps.users.models import User, Follow
+        user = get_object_or_404(User, username=self.kwargs["username"], is_active=True)
+
+        if user.is_private and user != request.user:
+            if not request.user.is_authenticated or not Follow.objects.filter(follower=request.user, following=user).exists():
+                return Response(
+                    {"detail": "This account is private."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        return super().list(request, *args, **kwargs)
 
 
 class RepostView(APIView):
@@ -188,3 +210,43 @@ class RepostView(APIView):
         )
 
         return Response({"detail": "Repost removed."}, status=status.HTTP_200_OK)
+
+
+class SavedPostView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        post = get_object_or_404(Post, pk=pk)
+        _, created = SavedPost.objects.get_or_create(user=request.user, post=post)
+
+        if not created:
+            return Response({"detail": "Post already saved."}, status=status.HTTP_400_BAD_REQUEST)
+
+        Post.objects.filter(pk=pk).update(saved_count=F("saved_count") + 1)
+        return Response({"detail": "Post saved."}, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, pk):
+        post = get_object_or_404(Post, pk=pk)
+        deleted, _ = SavedPost.objects.filter(user=request.user, post=post).delete()
+
+        if not deleted:
+            return Response({"detail": "Post not in saved list."},status=status.HTTP_400_BAD_REQUEST)
+
+        Post.objects.filter(pk=pk).update(saved_count=F("saved_count") - 1)
+        return Response({"detail": "Post unsaved."},status=status.HTTP_200_OK)
+
+
+class SavedPostListView(generics.ListAPIView):
+    serializer_class = PostSerializer
+    pagination_class = FeedCursorPagination
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Post.objects.filter(
+            saves__user=self.request.user
+        ).select_related("author").prefetch_related("hashtags").order_by("-saves__created_at")
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context

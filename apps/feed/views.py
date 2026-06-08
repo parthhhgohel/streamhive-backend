@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from apps.feed.cassandra_models import UserFeedModel, UserPostsModel
+from apps.users.models import User, Follow
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,13 @@ class UserTimelineFeedView(APIView):
         from django.shortcuts import get_object_or_404
 
         user = get_object_or_404(User, username=username, is_active=True)
+
+        if user.is_private:
+            if not request.user.is_authenticated:
+                return Response({"detail": "This account is private."}, status=403)
+            if request.user != user and not Follow.objects.filter(follower=request.user, following=user).exists():
+                return Response({"detail": "This account is private."}, status=403)
+
         limit = int(request.query_params.get("limit", 20))
         paging_state_b64 = request.query_params.get("cursor")
 
