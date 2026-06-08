@@ -225,73 +225,79 @@ def send_otp_email_direct(user_email: str, display_name: str, otp: str):
         raise
 
 # BREVO
-html_content = f"""<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-</head>
-<body style="margin:0;padding:0;background-color:#131316;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#131316;padding:48px 0;">
-    <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#1f1f22;border:1px solid #464554;border-radius:24px;overflow:hidden;">
+def send_password_changed_email_direct(user_email: str, display_name: str):
+    try:
+        import sib_api_v3_sdk
+        from django.conf import settings
+        from django.utils import timezone
 
-          <!-- Header -->
-          <tr>
-            <td style="padding:40px;background:linear-gradient(135deg,#4f4fd6,#3b3bbf);text-align:center;">
-              <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:800;letter-spacing:-0.03em;">StreamHive</h1>
-              <p style="margin:10px 0 0;color:#c0c1ff;font-size:13px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;">Account Security</p>
-            </td>
-          </tr>
+        html_content = f"""<!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8"/>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+          </head>
+          <body style="margin:0;padding:0;background-color:#131316;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#131316;padding:48px 0;">
+              <tr>
+                <td align="center">
+                  <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#1f1f22;border:1px solid #464554;border-radius:24px;overflow:hidden;">
 
-          <!-- Body -->
-          <tr>
-            <td style="padding:40px;">
-              <h2 style="margin:0 0 16px;color:#e4e1e6;font-size:20px;font-weight:700;letter-spacing:-0.02em;">Password Changed ✅</h2>
-              <p style="margin:0 0 28px;color:#c7c4d7;font-size:15px;line-height:1.7;">
-                Hi {display_name}, your StreamHive password was successfully changed on
-                <strong style="color:#e4e1e6;">{timezone.now().strftime("%B %d, %Y at %H:%M UTC")}</strong>.
-              </p>
+                    <!-- Header -->
+                    <tr>
+                      <td style="padding:40px;background:linear-gradient(135deg,#4f4fd6,#3b3bbf);text-align:center;">
+                        <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:800;letter-spacing:-0.03em;">StreamHive</h1>
+                        <p style="margin:10px 0 0;color:#c0c1ff;font-size:13px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;">Account Security</p>
+                      </td>
+                    </tr>
 
-              <!-- Warning block -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
-                <tr>
-                  <td style="padding:18px 20px;background-color:#1b1b1e;border:1px solid #464554;border-left:3px solid #ffb4ab;border-radius:14px;">
-                    <p style="margin:0;color:#ffb4ab;font-size:13px;line-height:1.7;">
-                      🚨 <strong>If you didn't do this</strong>, your account may be compromised. Please contact support immediately and reset your password.
-                    </p>
-                  </td>
-                </tr>
-              </table>
+                    <!-- Body -->
+                    <tr>
+                      <td style="padding:40px;">
+                        <h2 style="margin:0 0 16px;color:#e4e1e6;font-size:20px;font-weight:700;letter-spacing:-0.02em;">Password Changed ✅</h2>
+                        <p style="margin:0 0 28px;color:#c7c4d7;font-size:15px;line-height:1.7;">
+                          Hi {display_name}, your StreamHive password was successfully changed on
+                          <strong style="color:#e4e1e6;">{timezone.now().strftime("%B %d, %Y at %H:%M UTC")}</strong>.
+                        </p>
 
-              <!-- CTA -->
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center">
-                    <a href="{settings.FRONTEND_URL}/login"
-                       style="display:inline-block;background-color:#4f52c9;color:#e1e0ff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 40px;border-radius:9999px;letter-spacing:-0.01em;">
-                      Login to StreamHive
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
+                        <!-- Warning block -->
+                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+                          <tr>
+                            <td style="padding:18px 20px;background-color:#1b1b1e;border:1px solid #464554;border-left:3px solid #ffb4ab;border-radius:14px;">
+                              <p style="margin:0;color:#ffb4ab;font-size:13px;line-height:1.7;">
+                                🚨 <strong>If you didn't do this</strong>, your account may be compromised. Please contact support immediately and reset your password.
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
 
-          <!-- Footer -->
-          <tr>
-            <td style="padding:20px 40px;background-color:#0e0e11;border-top:1px solid #464554;text-align:center;">
-              <p style="margin:0;color:#464554;font-size:12px;">© 2025 StreamHive. All rights reserved.</p>
-            </td>
-          </tr>
+                        <!-- CTA -->
+                        <table width="100%" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td align="center">
+                              <a href="{settings.FRONTEND_URL}/login"
+                                style="display:inline-block;background-color:#4f52c9;color:#e1e0ff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 40px;border-radius:9999px;letter-spacing:-0.01em;">
+                                Login to StreamHive
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
 
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>"""
+                    <!-- Footer -->
+                    <tr>
+                      <td style="padding:20px 40px;background-color:#0e0e11;border-top:1px solid #464554;text-align:center;">
+                        <p style="margin:0;color:#464554;font-size:12px;">© 2025 StreamHive. All rights reserved.</p>
+                      </td>
+                    </tr>
+
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>"""
 
         configuration = sib_api_v3_sdk.Configuration()
         configuration.api_key["api-key"] = settings.BREVO_API_KEY
