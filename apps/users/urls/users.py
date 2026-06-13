@@ -1,5 +1,5 @@
 from django.urls import path
-from ..views.user_views import FollowerListView, FollowingListView, MeView, UserProfileView, FollowView, FollowRequestView
+from ..views.user_views import FollowerListView, FollowingListView, MeView, UserProfileView, FollowView, FollowRequestView, FollowSuggestionsView
 from ..views.verification_views import VerificationRequestView, VerificationRequestStatusView
 
 urlpatterns = [
@@ -7,6 +7,7 @@ urlpatterns = [
     path("verification-request/", VerificationRequestView.as_view(), name="verification_request"),
     path("verification-request/status/", VerificationRequestStatusView.as_view(), name="verification_status"),
     path("follow-requests/", FollowRequestView.as_view(), name="follow_requests"),
+    path("suggestions/", FollowSuggestionsView.as_view(), name="follow_suggestions"),
     path("follow-requests/<uuid:pk>/", FollowRequestView.as_view(), name="follow_request_action"),
     path("<str:username>/", UserProfileView.as_view(), name="user_profile"),
     path("<str:username>/follow/", FollowView.as_view(), name="follow"),

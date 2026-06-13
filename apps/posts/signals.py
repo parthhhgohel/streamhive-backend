@@ -50,14 +50,9 @@ logger = logging.getLogger(__name__)
 
 def _get_redis():
     """
-    Returns Redis connection only if REDIS_URL is configured.
-    Returns None if Redis is not available.
-    This prevents crashes on Render free tier where Redis may not be set.
+    Returns Redis connection, or None if Redis is unavailable.
     """
     try:
-        from django.conf import settings
-        if not getattr(settings, "REDIS_URL", None):
-            return None
         from django_redis import get_redis_connection
         return get_redis_connection("default")
     except Exception as e:

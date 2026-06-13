@@ -1,3 +1,4 @@
+from django.db.models import Count, Q
 from rest_framework import status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -7,7 +8,7 @@ from rest_framework import viewsets
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
 
-from ..models import User, Follow, FollowRequest
+from ..models import User, Follow, FollowRequest, Block
 from ..serializers import UserProfileSerializer, UpdateProfileSerializer, UserMinimalSerializer, FollowSerializer, UserListSerializer
 from core.permissions import IsOwner
 from core.pagination import StandardResultsPagination
@@ -153,6 +154,73 @@ class FollowView(APIView):
             )
 
         return Response({"detail": "Unfollowed successfully."})
+
+
+class FollowSuggestionsView(APIView):
+    """
+    GET /users/suggestions/?limit=10
+    Returns suggested users to follow:
+    1. Mutual-connection based (people followed by people you follow)
+    2. Backfilled with popular accounts if not enough mutuals
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        limit = int(request.query_params.get("limit", 10))
+        user = request.user
+
+        following_ids = set(
+            user.following_set.values_list("following_id", flat=True)
+        )
+        following_ids.add(user.id)
+
+        blocked_ids = set(
+            Block.objects.filter(
+                Q(blocker=user) | Q(blocked=user)
+            ).values_list("blocker_id", "blocked_id")
+        )
+
+        blocked_id_set = set()
+        for a, b in blocked_ids:
+            blocked_id_set.add(a)
+            blocked_id_set.add(b)
+        blocked_id_set.discard(user.id)
+
+        # 1.
+        mutual_candidates = (
+            Follow.objects
+            .filter(follower_id__in=user.following_set.values_list("following_id", flat=True))
+            .exclude(following_id__in=exclude_ids)
+            .values("following_id")
+            .annotate(mutual_count=Count("follower_id"))
+            .order_by("-mutual_count")[:limit]
+        )
+
+        suggested_ids = [row["following_id"] for row in mutual_candidates]
+        
+        # 2.
+        if len(suggested_ids) < limit:
+            remaining = limit - len(suggested_ids)
+            exclude_ids_with_suggested = exclude_ids | set(suggested_ids)
+
+            popular_users = (
+                User.objects
+                .filter(is_active=True)
+                .exclude(id__in=exclude_ids_with_suggested)
+                .annotate(followers_count=Count("follower_set"))
+                .order_by("-followers_count", "-is_verified")[:remaining]
+            )
+
+            suggested_ids += [u.id for u in popular_users]
+
+        users_by_id = User.objects.filter(id__in=suggested_ids).in_bulk()
+        ordered_users = [users_by_id[uid] for uid in suggested_ids if uid in users_by_id]
+
+        serializer = UserListSerializer(
+            ordered_users, many=True, context={"request": request}
+        )
+
+        return Response({"results": serializer.data})
 
 
 class FollowRequestView(APIView):

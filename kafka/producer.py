@@ -27,7 +27,7 @@ class KafkaProducer:
 
             config = {
                 "bootstrap.servers": settings.KAFKA_BOOTSTRAP_SERVERS,
-                "acks": "all",
+                "acks": 1,
                 "retries": 3,
                 "message.timeout.ms": 5000,
             }
@@ -74,8 +74,8 @@ class KafkaProducer:
             )
 
             # flush makes sure the message is actually sent
-            # producer.poll(0)
-            producer.flush()
+            producer.poll(0)
+            # producer.flush()
 
         except Exception as e:
             # IMPORTANT: never let Kafka failure break the main request
