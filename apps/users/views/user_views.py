@@ -85,7 +85,7 @@ class FollowView(APIView):
             if not created:
                 if follow_request.status == FollowRequest.Status.PENDING:
                     return Response({"detail": "Follow request already sent."}, status=status.HTTP_400_BAD_REQUEST)
-                elif follow_request.status == FollowRequest.Status.REJECTED:
+                elif follow_request.status  in [ FollowRequest.Status.REJECTED, FollowRequest.Status.ACCEPTED ]:
                     # Allow re-sending after rejection
                     follow_request.status = FollowRequest.Status.PENDING
                     follow_request.save()
@@ -119,6 +119,7 @@ class FollowView(APIView):
         )
 
         cache.delete(f"user_profile_{username}")
+        cache.delete(f"user_profile_{request.user.username}")
         return Response({"detail": "Followed successfully."}, status=status.HTTP_201_CREATED)
 
     def delete(self, request, username):
@@ -127,7 +128,10 @@ class FollowView(APIView):
         follow_request_deleted, _ = FollowRequest.objects.filter(
             sender=request.user,
             receiver=target_user,
-            status=FollowRequest.Status.PENDING
+            status__in=[
+                FollowRequest.Status.PENDING,
+                FollowRequest.Status.ACCEPTED
+            ]
         ).delete()
 
         follow_deleted, _ = Follow.objects.filter(
@@ -142,6 +146,7 @@ class FollowView(APIView):
             )
 
         cache.delete(f"user_profile_{username}")
+        cache.delete(f"user_profile_{request.user.username}")
 
         if follow_deleted:
             kafka_producer.publish(

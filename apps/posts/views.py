@@ -194,6 +194,9 @@ class RepostView(APIView):
     def delete(self, req, pk):
         original_post = get_object_or_404(Post, pk=pk)
 
+        if original_post.is_repost:
+            original_post = original_post.parent
+
         repost = Post.objects.filter(
             author=req.user,
             parent=original_post,

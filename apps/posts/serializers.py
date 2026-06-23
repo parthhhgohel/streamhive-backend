@@ -109,12 +109,6 @@ class PostCreateSerializer(serializers.ModelSerializer):
                 },
                 key=str(user.id)
             )
-
-        if post.is_repost and post.parent:
-            from django.db.models import F
-            Post.objects.filter(pk=post.parent.pk).update(
-                repost_count=F("repost_count") + 1
-            )
         
         kafka_producer.publish(
             topic=Topics.POST_CREATED,
