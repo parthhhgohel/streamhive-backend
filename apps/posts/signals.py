@@ -37,6 +37,7 @@
 
 ####-------------------------------------------- KAFKA ----------------------------------------------###
 from django.db.models.signals import post_save, post_delete, m2m_changed
+from django.conf import settings
 from django.dispatch import receiver
 from django.db.models import F
 from .models import Like, Post
@@ -58,6 +59,17 @@ def _get_redis():
     except Exception as e:
         logger.error(f"Redis connection failed: {e}")
         return None
+
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
+def create_default_collection(sender, instance, created, **kwargs):
+    if created:
+        from .models import Collection
+
+        Collection.objects.create(
+            author=instance,
+            name="All Posts",
+            is_default=True
+        )
 
 @receiver(post_save, sender=Like)
 def on_like_created(sender, instance, created, **kwargs):

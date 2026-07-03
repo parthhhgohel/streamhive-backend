@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Post, Like, Hashtag, SavedPost
+from .models import Post, Like, Hashtag, Collection, CollectionPost
 from apps.users.serializers import UserMinimalSerializer
 from core.utils import extract_hashtags, extract_mentions
 from kafka.producer import kafka_producer
@@ -25,8 +25,8 @@ class PostSerializer(serializers.ModelSerializer):
         model = Post
         fields = [
             "id", "author", "content", "media",
-            "parent", "is_repost",
-            "like_count", "comment_count", "repost_count", "saved_count",
+            "parent", "is_repost", "is_pinned",
+            "like_count", "comment_count", "repost_count",
             "hashtags", "is_liked", "is_reposted", "is_saved",
             "created_at", "updated_at"
         ]
@@ -65,8 +65,11 @@ class PostSerializer(serializers.ModelSerializer):
     def get_is_saved(self, obj):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
-            return SavedPost.objects.filter(user=request.user, post=obj).exists()
+            return CollectionPost.objects.filter(
+                collection__author=request.user, post=obj
+            ).exists()
         return False
+
 
 class PostCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -137,3 +140,55 @@ class LikeSerializer(serializers.ModelSerializer):
 
 class RepostSerializer(serializers.Serializer):
     parent = serializers.UUIDField(required=True)
+
+
+class CollectionSerializer(serializers.ModelSerializer):
+    author = UserMinimalSerializer(read_only=True)
+    post_count = serializers.IntegerField(source="items.count", read_only=True)
+    cover_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Collection
+        fields = ["id", "author", "name", "post_count", "cover_image", "is_default", "created_at"]
+        read_only_fields = ["id", "author", "is_default", "created_at"]
+
+    def get_cover_image(self, obj):
+        item = obj.items.select_related("post").order_by("-added_at").first()
+        return item.post.media.url if item and item.post.media else None
+
+    def validate_name(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Collection name cannot be empty.")
+        return value
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        collection = Collection.objects.create(author=user, name=validated_data["name"])
+        return collection
+
+
+class CollectionDetailSerializer(serializers.ModelSerializer):
+    author = UserMinimalSerializer(read_only=True)
+    post_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Collection
+        fields = ["id", "author", "name", "is_default", "post_count", "created_at"]
+        read_only_fields = ["id", "author", "is_default", "created_at"]
+
+
+class CollectionSaveStateSerializer(serializers.ModelSerializer):
+    post_count = serializers.IntegerField(source="items.count", read_only=True)
+    cover_image = serializers.SerializerMethodField()
+    is_saved = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Collection
+        fields = ["id", "name", "is_default", "post_count", "cover_image", "is_saved"]
+
+    def get_is_saved(self, obj):
+        return obj.items.filter(post_id=self.context["post_id"]).exists()
+
+    def get_cover_image(self, obj):
+        item = obj.items.select_related("post").order_by("-added_at").first()
+        return item.post.media.url if item and item.post.media else None

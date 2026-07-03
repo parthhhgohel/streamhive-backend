@@ -1,4 +1,5 @@
 from django.db.models import Count, Q
+from django.db import transaction
 from rest_framework import status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -9,6 +10,8 @@ from django.shortcuts import get_object_or_404
 from django.core.cache import cache
 
 from ..models import User, Follow, FollowRequest, Block
+from apps.posts.models import Like
+from apps.comments.models import Comment
 from ..serializers import UserProfileSerializer, UpdateProfileSerializer, UserMinimalSerializer, FollowSerializer, UserListSerializer
 from core.permissions import IsOwner
 from core.pagination import StandardResultsPagination
@@ -191,6 +194,8 @@ class FollowSuggestionsView(APIView):
             blocked_id_set.add(b)
         blocked_id_set.discard(user.id)
 
+        exclude_ids = following_ids | blocked_id_set
+
         # 1.
         mutual_candidates = (
             Follow.objects
@@ -328,6 +333,79 @@ class FollowingListView(generics.ListAPIView):
 
         return super().list(request, *args, **kwargs)
 
+
+class BlockView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, username):
+        target_user = User.objects.filter(username=username, is_active=True).first()
+
+        if not target_user:
+            return Response({"detail": "User does not exist."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if request.user == target_user:
+            return Response({"detail": "You can't block yourself."}, status=status.status.HTTP_400_BAD_REQUEST)
+
+        is_blocked = Blocker.objects.filter(blocker=request.user, blocked=target_user).first()
+
+        if is_blocked:
+            return Response({"detail": "You have already blocked this user."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            blocked = Block.objects.create(blocker=request.user, blocked=target_user)
+
+            if not blocked:
+                return Response({"detail": "Failed to block user."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            Follow.objects.filter(follower=request.user, following=target_user).delete()
+            Follow.objects.filter(follower=target_user, following=request.user).delete()
+
+            FollowRequest.objects.filter(
+                sender=request.user, receiver=target_user
+            ).delete()
+            FollowRequest.objects.filter(
+                sender=target_user, receiver=request.user
+            ).delete()
+
+            Like.objects.filter(user=request.user, post__author=target_user).delete()
+            Comment.objects.filter(author=request.user, post__author=target_user).delete()
+
+        cache.delete(f"user_profile_{username}")
+        cache.delete(f"user_profile_{request.user.username}")
+        
+        return Response({"detail": "User blocked successfully."}, status=status.HTTP_200_OK)
+
+    def delete(self, request, username):
+        target_user = User.objects.filter(username=username)
+
+        if not target_user:
+            return Response({"detail": "User does not exist."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if request.user == target_user:
+            return Response({"detail": "You can't unblock yourself."}, status=status.HTTP_403_FORBIDDEN)
+
+        is_blocked = Block.objects.filter(blocker=request.user, blocked=target_user).first()
+
+        if not is_blocked:
+            return Response({"detail": "You have not blocked this user."}, status=status.HTTP_403_FORBIDDEN)
+
+        with transaction.atomic():
+            is_blocked.delete()
+
+        return Response({"detail":"User unblocked successfully."}, status=status.HTTP_200_OK)
+
+
+class BlockListView(generics.ListAPIView):
+    """
+    GET /users/blocked/  — get list of blocked users
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserMinimalSerializer
+    pagination_class = StandardResultsPagination
+
+    def get_queryset(self):
+        blocked_ids = Block.objects.filter(blocker=self.request.user).values_list("blocked_id", flat=True)
+        return User.objects.filter(id__in=blocked_ids, is_active=True)
 
 
 # Extra later implementation for me

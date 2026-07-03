@@ -23,10 +23,10 @@ class Post(models.Model):
     )
 
     is_repost = models.BooleanField(default=False)
+    is_pinned = models.BooleanField(default=False)
     like_count = models.PositiveIntegerField(default=0)
     comment_count = models.PositiveIntegerField(default=0)
     repost_count = models.PositiveIntegerField(default=0)
-    saved_count = models.PositiveIntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -73,16 +73,37 @@ class Hashtag(models.Model):
         return f"#{self.name}"
 
 
-class SavedPost(models.Model):
+class Collection(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="saves")
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_posts")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="collections")
+    name = models.CharField(max_length=100)
+    is_default = models.BooleanField(default=False)
+    posts = models.ManyToManyField(
+        Post,
+        through="CollectionPost",
+        related_name="collections",
+        blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "saved_posts"
-        unique_together = ("user", "post")
+        db_table = "collections"
+        unique_together = ("author", "name")
         indexes = [
-            models.Index(fields=["user"]),
+            models.Index(fields=["author"]),
+        ]
+
+
+class CollectionPost(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    collection = models.ForeignKey(Collection, on_delete=models.CASCADE, related_name="items")
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="collection_items")
+    added_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = "collection_posts"
+        unique_together = ("collection", "post")
+        indexes = [
+            models.Index(fields=["collection"]),
             models.Index(fields=["post"]),
         ]

@@ -9,10 +9,11 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
 from rest_framework.views import APIView
-from django.db.models import F
+from django.db.models import F, Exists, Count, OuterRef
+from django.db import IntegrityError
 
-from .models import Post, Like, SavedPost
-from .serializers import PostSerializer, PostCreateSerializer
+from .models import Post, Like, Collection, CollectionPost
+from .serializers import PostSerializer, PostCreateSerializer, CollectionSerializer, CollectionDetailSerializer, CollectionSaveStateSerializer
 from core.permissions import IsOwnerOrReadOnly
 from core.pagination import FeedCursorPagination
 
@@ -79,6 +80,36 @@ class PostRepliesView(generics.ListAPIView):
         return context
 
 
+class PostPinView(APIView):
+    # POST /posts/<id>/pin/ - pin post
+    # DELETE /posts/<id>/pin/ - unpin post\
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        post = get_object_or_404(Post, pk=pk)
+
+        if post.author != request.user:
+            return Response({"detail": "You can't pin someone else's post."}, status=status.HTTP_403_FORBIDDEN)
+
+        if post.is_pinned:
+            return Response({"detail": "Post is already pinned."}, status=status.HTTP_400_BAD_REQUEST)
+
+        Post.objects.filter(pk=pk).update(is_pinned=True)
+        return Response({"detail": "Post pinned."}, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk):
+        post = get_object_or_404(Post, pk=pk)
+
+        if post.author != request.user:
+            return Response({"detail": "You can't unpin someone else's post."}, status=status.HTTP_403_FORBIDDEN)
+
+        if not post.is_pinned:
+            return Response({"detail": "Post is not pinned."}, status=status.HTTP_400_BAD_REQUEST)
+
+        Post.objects.filter(pk=pk).update(is_pinned=False)
+        return Response({"detail": "Post unpinned."}, status=status.HTTP_200_OK)
+
+
 class LikeToggleView(APIView):
     # POST   /posts/<id>/like/  - like a post
     # DELETE /posts/<id>/like/  - unlike a post
@@ -115,7 +146,13 @@ class UserPostsView(generics.ListAPIView):
 
     def get_queryset(self):
         from apps.users.models import User, Follow
-        user = get_object_or_404(User, username=self.kwargs["username"], is_active=True)
+        
+        # cache on self so list() doesn't re-fetch
+        if not hasattr(self, '_target_user'):
+            self._target_user = get_object_or_404(
+                User, username=self.kwargs["username"], is_active=True
+            )
+        user = self._target_user
 
         if user.is_private:
             request = self.request
@@ -125,7 +162,7 @@ class UserPostsView(generics.ListAPIView):
             if request.user != user and not Follow.objects.filter(follower=request.user, following=user).exists():
                 return Post.objects.none()
         
-        return Post.objects.filter(author=user).select_related("author").prefetch_related("hashtags")
+        return (Post.objects.filter(author=user).select_related("author").prefetch_related("hashtags").order_by("-is_pinned", "-created_at"))
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -134,7 +171,11 @@ class UserPostsView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         from apps.users.models import User, Follow
-        user = get_object_or_404(User, username=self.kwargs["username"], is_active=True)
+        user = getattr(self, '_target_user', None)
+
+        if user is None:
+            self.get_queryset()
+            user = self._target_user
 
         if user.is_private and user != request.user:
             if not request.user.is_authenticated or not Follow.objects.filter(follower=request.user, following=user).exists():
@@ -215,41 +256,156 @@ class RepostView(APIView):
         return Response({"detail": "Repost removed."}, status=status.HTTP_200_OK)
 
 
-class SavedPostView(APIView):
+class BookmarkView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
         post = get_object_or_404(Post, pk=pk)
-        _, created = SavedPost.objects.get_or_create(user=request.user, post=post)
-
-        if not created:
+        default_collection = get_object_or_404(
+            Collection, author=request.user, is_default=True
+        )
+        try:
+            CollectionPost.objects.create(collection=default_collection, post=post)
+        except IntegrityError:
             return Response({"detail": "Post already saved."}, status=status.HTTP_400_BAD_REQUEST)
-
-        Post.objects.filter(pk=pk).update(saved_count=F("saved_count") + 1)
         return Response({"detail": "Post saved."}, status=status.HTTP_201_CREATED)
 
     def delete(self, request, pk):
         post = get_object_or_404(Post, pk=pk)
-        deleted, _ = SavedPost.objects.filter(user=request.user, post=post).delete()
-
+        deleted, _ = CollectionPost.objects.filter(
+            collection__author=request.user, post=post
+        ).delete()
         if not deleted:
-            return Response({"detail": "Post not in saved list."},status=status.HTTP_400_BAD_REQUEST)
-
-        Post.objects.filter(pk=pk).update(saved_count=F("saved_count") - 1)
-        return Response({"detail": "Post unsaved."},status=status.HTTP_200_OK)
+            return Response({"detail": "Post not saved."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": "Post unsaved."}, status=status.HTTP_200_OK)
 
 
-class SavedPostListView(generics.ListAPIView):
+class BookmarkListView(generics.ListAPIView):
     serializer_class = PostSerializer
     pagination_class = FeedCursorPagination
     permission_classes = [IsAuthenticated]
-
+    
     def get_queryset(self):
-        return Post.objects.filter(
-            saves__user=self.request.user
-        ).select_related("author").prefetch_related("hashtags").order_by("-saves__created_at")
+        default_collection = get_object_or_404(
+            Collection, author=self.request.user, is_default=True
+        )
+        qs = Post.objects.filter(
+            collection_items__collection=default_collection
+        ).select_related("author").prefetch_related("hashtags").order_by("-collection_items__added_at")
+
+        return qs
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["request"] = self.request
         return context
+
+
+class PostSaveOptionsView(generics.ListAPIView):
+    serializer_class = CollectionSaveStateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Collection.objects.filter(author=self.request.user).order_by("-is_default", "-created_at")
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["post_id"] = self.kwargs["pk"]
+        return context
+
+
+class CollectionListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CollectionSerializer
+
+    def get_queryset(self):
+        return Collection.objects.filter(
+            author=self.request.user
+        ).select_related("author").annotate(post_count=Count("items"))
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
+
+
+class CollectionDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
+    serializer_class = CollectionDetailSerializer
+
+    def get_queryset(self):
+        return Collection.objects.filter(
+            author=self.request.user
+        ).select_related("author").annotate(post_count=Count("items"))
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
+
+    def update(self, request, *args, **kwargs):
+        collection = self.get_object()
+        if collection.is_default:
+            return Response(
+                {"detail": "The default collection cannot be renamed."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        collection = self.get_object()
+        if collection.is_default:
+            return Response(
+                {"detail": "The default collection cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().destroy(request, *args, **kwargs)
+
+
+class CollectionPostsView(generics.ListAPIView):
+    serializer_class = PostSerializer
+    pagination_class = FeedCursorPagination
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        collection = get_object_or_404(
+            Collection, pk=self.kwargs["pk"], author=self.request.user
+        )
+
+        qs = Post.objects.filter(
+            collection_items__collection=collection
+        ).select_related("author").prefetch_related("hashtags").order_by(
+            "-collection_items__added_at"
+        )
+
+        return qs
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
+
+
+class CollectionPostView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk, post_id):
+        collection = get_object_or_404(Collection, pk=pk, author=request.user)
+        post = get_object_or_404(Post, pk=post_id)
+
+        try:
+            CollectionPost.objects.create(collection=collection, post=post)
+        except IntegrityError:
+            return Response({"detail": "Post already in collection."}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"detail": "Post added to collection."}, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, pk, post_id):
+        collection = get_object_or_404(Collection, pk=pk, author=request.user)
+        post = get_object_or_404(Post, pk=post_id)
+
+        deleted, _ = CollectionPost.objects.filter(collection=collection, post=post).delete()
+        if not deleted:
+            return Response({"detail": "Post not in collection."}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"detail": "Post removed from collection."}, status=status.HTTP_200_OK)
